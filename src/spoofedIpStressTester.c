@@ -125,8 +125,15 @@ int main(int argc, char **argv) {
 			printf("Send failed\n");
 		iph->saddr++;
 
-		if (j % 100000 == 0)
-			printf("Sending packet #%d\n", j);
+		if (j % 100 == 0)
+		{
+			printf("Sending packet #%d. Press a key to continue\n", j);
+			getchar();
+			printf("Going...\n");
+		}
+
+		usleep(5000);
+
 	}
 
 	return EXIT_SUCCESS;
