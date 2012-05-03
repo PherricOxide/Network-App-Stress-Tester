@@ -20,6 +20,9 @@ along with this software. If not, see <http://www.gnu.org/licenses/>.
  ============================================================================
  */
 
+
+#include <unistd.h>
+#include <time.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -35,9 +38,9 @@ along with this software. If not, see <http://www.gnu.org/licenses/>.
 #include <netpacket/packet.h>
 
 // Change these values for you own network
-u_int8_t destMac[] = {0x11,0x22,0x33,0x44,0x55,0x66};
+u_int8_t destMac[] = {0x00,0x23,0xae,0x6f,0x97,0x08};
 u_int8_t srcMac[] = {0x22,0x33,0x44,0x55,0x66,0x77};
-char *destIp = "192.168.0.1";
+char *destIp = "192.168.3.147";
 
 inline unsigned short csum(unsigned short *buf, int nwords)
 {
