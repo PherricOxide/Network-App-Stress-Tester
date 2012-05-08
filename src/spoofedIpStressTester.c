@@ -1,9 +1,8 @@
 /*
  ============================================================================
- Name        : spoofedIpStressTester.c
  Author      : PherricOxide
  Description : Network application stress testing tool for sending large amounts
- of UDP packets with spoofed source and MAC addresses to a host with known IP and MAC.
+ of UDP packets with fuzzed fields
 
 This is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,6 +21,7 @@ along with this software. If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <unistd.h>
+#include <stdint.h>
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
@@ -38,32 +38,53 @@ along with this software. If not, see <http://www.gnu.org/licenses/>.
 #include <netpacket/packet.h>
 
 
-#define FuzzSrcIp 0
-#define FuzzPayloadSize 1
-#define FuzzPacketInterval 2
+bool fuzzRandom_SrcIp = false;
+bool fuzzSequential_SrcIp = false;
+
+bool fuzzRandom_DstIp  = false;
+bool fuzzSequential_DstIp  = false;
+
+bool fuzzRandom_SrcPort = false;
+bool fuzzSequential_SrcPort = false;
+
+bool fuzzRandom_DstPort = false;
+bool fuzzSequential_DstPort = false;
+
+
+bool fuzzPayloadSize = false;
+
+bool fuzzPacketInterval = false;
+
 
 // Defaults (probably not what you want, make sure to enter real values in args)
-u_int8_t srcMac[] = {0x22,0x33,0x44,0x55,0x66,0x77};
-u_int16_t srcPort = 42;
-u_int16_t dstPort = 42;
+uint8_t srcMac[] = {0x22,0x33,0x44,0x55,0x66,0x77};
+uint8_t dstMac[6];
 
-u_int8_t dstMac[6];
-char *destIp;
-char *srcIp = "192.168.10.42";
+uint32_t dstIp;
+uint32_t dstIpMin = 0;
+uint32_t dstIpMax = ~0;
+
+uint32_t srcIp;
+uint32_t srcIpMin = 0;
+uint32_t srcIpMax = ~0;
 
 int packetCount = 0;
 
 // In useconds
-int intervalMin = 5000;
-int intervalMax = 5001;
+int intervalMin = 1000;
+int intervalMax = 10000;
 
 // In bytes
-int payloadSizeMin = 10;
-int payloadSizeMax = 11;
+int payloadSizeMin = 1;
+int payloadSizeMax = 1000;
 
+uint16_t srcPort = 0;
+uint16_t srcPortMin = 0;
+uint16_t srcPortMax = 65535;
 
-int fuzzmask = 0;
-
+uint16_t dstPort = 0;
+uint16_t dstPortMin = 0;
+uint16_t dstPortMax = 65535;
 
 
 inline unsigned short csum(unsigned short *buf, int nwords)
@@ -83,21 +104,37 @@ int main(int argc, char **argv)
 		printf("Usage options (may not apply to all fuzzing types),\n");
 	    printf("-srcip x.x.x.x\n");
 	    printf("-dstip x.x.x.x\n\n");
+
 	    printf("-srcmac xx:xx:xx:xx:xx:xx\n");
 	    printf("-dstmac xx:xx:xx:xx:xx:xx\n\n");
-	    printf("-srcport x\n");
-	    printf("-dstport x\n\n");
-	    printf("-payloadmin x\n");
-	    printf("-payloadmax x\n\n");
-	    printf("-intervalmin x\n");
-	    printf("-intervalmax x\n\n");
-	    printf("-packetcount x\n\n");
+	    
+		printf("-srcport x\n");
+		printf("-srcportmin x\n");
+		printf("-srcportmax x\n\n");
 
-	    printf("-fuzzmask x\n");
-		printf("Fuzz bitmask bit names options,\n");
-		printf("    FuzzSrcIp %d\n", FuzzSrcIp);
-		printf("    FuzzPayloadSize %d\n", FuzzPayloadSize);
-		printf("    FuzzPacketInterval %d\n", FuzzPacketInterval);
+	    printf("-dstport x\n");
+	    printf("-dstportmin x\n");
+	    printf("-dstportmax x\n\n");
+	    
+		printf("-payloadmin x\n");
+	    printf("-payloadmax x\n\n");
+	    
+		printf("-intervalmin x\n");
+		printf("-intervalmax x\n\n");
+	    
+		printf("-packetcount x\n\n");
+
+		printf("Fuzzer options\n");
+		printf("-fuzzRandomSrcPort\n");
+		printf("-fuzzSequentialSrcPort\n");
+		printf("-fuzzRandomDstPort\n");
+		printf("-fuzzSequentialDstPort\n");
+		printf("-fuzzRandomSrcIp\n");
+		printf("-fuzzSequentialSrcIp\n");
+		printf("-fuzzRandomDstIp\n");
+		printf("-fuzzSequentialDstIp\n");
+		printf("-fuzzPayloadSize\n");
+		printf("-fuzzPacketInterval\n");
 
 
 		printf("\nNeed more help? Use the source Luke.\n");
@@ -110,13 +147,13 @@ int main(int argc, char **argv)
 	{
 		if (!strcmp(argv[i], "-dstip"))
 		{
-		  destIp = argv[i+1];
-		  printf("Targeting IP address %s\n", destIp);
+		  dstIp = inet_addr(argv[i+1]);
+		  printf("Targeting IP address %s\n", argv[i+1]);
 		}
 		else if (!strcmp(argv[i], "-srcip"))
 		{
-		  srcIp = argv[i+1];
-		  printf("Spoofed source IP address %s\n", srcIp);
+		  srcIp = inet_addr(argv[i+1]);
+		  printf("Spoofed source IP address %s\n", argv[i+1]);
 		}
 		else if (!strcmp(argv[i], "-srcmac"))
 		{
@@ -148,6 +185,52 @@ int main(int argc, char **argv)
 			intervalMax = atoi(argv[i+1]);
 			printf("Set max interpacket delay to %d useconds\n", intervalMax);
 		}
+
+
+		else if (!strcmp(argv[i], "-srcportmin"))
+		{
+			srcPortMin = atoi(argv[i+1]);
+			printf("Set min src port to %d\n", srcPortMin);
+		}
+		else if (!strcmp(argv[i], "-srcportmax"))
+		{
+			srcPortMax = atoi(argv[i+1]);
+			printf("Set max src port to %d\n", srcPortMax);
+		}
+		else if (!strcmp(argv[i], "-dstportmin"))
+		{
+			dstPortMin = atoi(argv[i+1]);
+			printf("Set min dst port  to %d\n", dstPortMin);
+		}
+		else if (!strcmp(argv[i], "-dstportmax"))
+		{
+			dstPortMax = atoi(argv[i+1]);
+			printf("Set max dst port to %d\n", dstPortMax);
+		}
+
+
+		else if (!strcmp(argv[i], "-srcipmin"))
+		{
+			srcIpMin = inet_addr(argv[i+1]);
+			printf("Set min src ip to %s\n", argv[i+1]);
+		}
+		else if (!strcmp(argv[i], "-srcipmax"))
+		{
+			srcIpMax = inet_addr(argv[i+1]);
+			printf("Set max src ip to %s\n", argv[i+1]);
+		}
+		else if (!strcmp(argv[i], "-dstipmin"))
+		{
+			dstIpMin = inet_addr(argv[i+1]);
+			printf("Set min dst ip  to %s\n", argv[i+1]);
+		}
+		else if (!strcmp(argv[i], "-dstipmax"))
+		{
+			dstIpMax = inet_addr(argv[i+1]);
+			printf("Set max dst ip to %s\n", argv[i+1]);
+		}
+
+
 		else if (!strcmp(argv[i], "-payloadmin"))
 		{
 			payloadSizeMin = atoi(argv[i+1]);
@@ -163,15 +246,66 @@ int main(int argc, char **argv)
 			packetCount = atoi(argv[i+1]);
 			printf("Number of packets to send: %d\n", packetCount);
 		}
-		else if (!strcmp(argv[i], "-fuzzmask"))
+
+		// Fuzzer options
+		else if (!strcmp(argv[i], "-fuzzRandomSrcPort"))
 		{
-			// TODO: Make this input useable for normal people (eg people who can't compute bitmasks in their head)
-			fuzzmask = atoi(argv[i+1]);
-			printf("Fuzzmask is : %d\n", fuzzmask);
+			printf("Randomly fuzzing src port\n");
+			fuzzRandom_SrcPort= true;
 		}
+		else if (!strcmp(argv[i], "-fuzzSequentialSrcPort"))
+		{
+			printf("Sequentially fuzzing src port\n");
+			fuzzSequential_SrcPort = true;
+		}
+		else if (!strcmp(argv[i], "-fuzzRandomDstPort"))
+		{
+			printf("Randomly fuzzing dst port\n");
+			fuzzRandom_DstPort = true;
+		}
+		else if (!strcmp(argv[i], "-fuzzSequentialDstPort"))
+		{
+			printf("Sequentially fuzzing dst port\n");
+			fuzzSequential_DstPort = true;
+		}
+		else if (!strcmp(argv[i], "-fuzzRandomSrcIp"))
+		{
+			fuzzRandom_SrcIp = true;
+		}
+		else if (!strcmp(argv[i], "-fuzzSequentialSrcIp"))
+		{
+			fuzzSequential_SrcIp = true;
+		}
+		else if (!strcmp(argv[i], "-fuzzRandomDstIp"))
+		{
+			fuzzRandom_DstIp = true;
+		}
+		else if (!strcmp(argv[i], "-fuzzSequentialDstIp"))
+		{
+			fuzzSequential_DstIp = true;
+		}
+		else if (!strcmp(argv[i], "-fuzzPayloadSize"))
+		{
+			fuzzPayloadSize = true;
+		}
+		else if (!strcmp(argv[i], "-fuzzPacketInterval"))
+		{
+			fuzzPacketInterval = true;
+		}
+
+
 
 	}
 	printf("=== Done parsing user input ===\n\n");
+
+
+
+	if (fuzzSequential_SrcIp || fuzzRandom_SrcIp) {srcIp = srcIpMin;}	
+	if (fuzzSequential_DstIp || fuzzRandom_DstIp) {dstIp = dstIpMin;}
+	if (fuzzSequential_SrcPort || fuzzRandom_SrcPort) {srcPort = srcPortMin;}
+	if (fuzzSequential_DstPort || fuzzRandom_DstPort) {dstPort = dstPortMin;}
+
+
 
 
 	unsigned int iseed = (unsigned int)time(NULL);
@@ -213,8 +347,8 @@ int main(int argc, char **argv)
 	iph->ttl = 30;
 	iph->protocol = 17; // UDP
 	/* Destination IP address */
-	iph->daddr = inet_addr(destIp);
-	iph->saddr = inet_addr(srcIp);
+	iph->daddr = dstIp;
+	iph->saddr = srcIp;
 	headersLength += sizeof(struct iphdr);
 
 
@@ -255,17 +389,13 @@ int main(int argc, char **argv)
 		socket_address.sll_addr[i] = dstMac[i];
 
 
-	// Initialize fuzzer stuff
-	if (fuzzmask & (1 << FuzzSrcIp))
-	{
-		iph->saddr = 0;
-	}
 
-
+	
+	printf("=== Sending fuzzed packets ===\n");
 	int j = 0;
 	for (j = 0; j < packetCount; j++)
 	{
-		if (fuzzmask & (1 << FuzzPayloadSize))
+		if (fuzzPayloadSize)
 		{
 			payloadSize = payloadSizeMin + rand()%(payloadSizeMax - payloadSizeMin);
 			//printf("Sending payload size %d\n", payloadSize);
@@ -275,7 +405,7 @@ int main(int argc, char **argv)
 			/* Length of IP payload and header */
 			iph->tot_len = htons(headersLength + payloadSize - sizeof(struct ether_header));
 			/* Calculate IP checksum on completed header */
-			iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr)/2);
+			//iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr)/2);
 		}
 		else
 		{
@@ -284,20 +414,74 @@ int main(int argc, char **argv)
 
 
 		// Send the packet we crafted
+		/* Calculate IP checksum on completed header */
+		iph->check = 0;
+		iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr)/2);
 		if (sendto(sockfd, sendbuf, headersLength + payloadSize, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
 		{
 			printf("Send failed\n");
 		}
 
 		// Set up the headers for the next packet
-		if (fuzzmask & (1 << FuzzSrcIp))
+		if (fuzzSequential_SrcIp)
 		{
+			printf("Fuzzing src ip\n");
 			iph->saddr = htonl(ntohl(iph->saddr)+ 1);
-			//printf("Sending from IP %d\n", iph->saddr);
+
+			if (iph->saddr == srcIpMax)
+			{
+				iph->saddr = srcIpMin;
+			}
+		}
+		
+		if (fuzzSequential_DstIp)
+		{
+			iph->daddr = htonl(ntohl(iph->daddr)+ 1);
+
+			if (iph->daddr == dstIpMax)
+			{
+				iph->daddr = dstIpMin;
+			}
+		}
+
+		if (fuzzRandom_SrcIp)
+		{
+			iph->saddr = srcIpMin + rand()%(srcIpMax - srcIpMin);	
+		}
+
+		if (fuzzRandom_SrcPort)
+		{
+			udph->source = htons(srcPortMin + rand()%(srcPortMax - srcPortMin));		
+		}
+
+		if (fuzzRandom_DstPort)
+		{
+			udph->dest = htons(srcPortMin + rand()%(dstPortMax - dstPortMin));		
+		}
+
+		if (fuzzSequential_SrcPort)
+		{
+			srcPort++;
+			if (srcPort > srcPortMax)
+			{
+				srcPort = srcPortMin;
+			}
+			udph->source = htons(srcPort);
+		}
+
+		if (fuzzSequential_DstPort)
+		{
+			dstPort++;
+			if (srcPort > dstPortMax)
+			{
+				srcPort = dstPortMin;
+			}
+			udph->dest = htons(dstPort);
 		}
 
 
-		if (fuzzmask & (1 << FuzzPacketInterval))
+
+		if (fuzzPacketInterval)
 		{
 			int sleepInterval = intervalMin + rand()%(intervalMax - intervalMin);
 			//printf("Sleeping %d\n", sleepInterval);
@@ -309,5 +493,6 @@ int main(int argc, char **argv)
 		}
 	}
 
+	printf("=== Finished! Exiting now ===\n");
 	return EXIT_SUCCESS;
 }
