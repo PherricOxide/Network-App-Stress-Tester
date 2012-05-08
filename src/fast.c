@@ -62,16 +62,17 @@ uint8_t srcMac[] = {0x22,0x33,0x44,0x55,0x66,0x77};
 uint8_t dstMac[6];
 
 uint32_t dstIp;
-uint32_t dstIpMin = 0;
+uint32_t dstIpMin = 1;
 uint32_t dstIpMax = ~0;
 
 uint32_t srcIp;
-uint32_t srcIpMin = 0;
+uint32_t srcIpMin = 1;
 uint32_t srcIpMax = ~0;
 
 int packetCount = 0;
 
 // In useconds
+int interval = 5000;
 int intervalMin = 1000;
 int intervalMax = 10000;
 
@@ -104,7 +105,12 @@ int main(int argc, char **argv)
 	if (argc < 2) {
 		printf("Usage options (may not apply to all fuzzing types),\n");
 	    printf("-srcip x.x.x.x\n");
-	    printf("-dstip x.x.x.x\n\n");
+	    printf("-srcipmin x.x.x.x\n");
+	    printf("-srcipmax x.x.x.x\n");
+	    
+		printf("-dstip x.x.x.x\n\n");
+		printf("-dstipmin x.x.x.x\n\n");
+		printf("-dstipmax x.x.x.x\n\n");
 
 	    printf("-srcmac xx:xx:xx:xx:xx:xx\n");
 	    printf("-dstmac xx:xx:xx:xx:xx:xx\n\n");
@@ -120,21 +126,26 @@ int main(int argc, char **argv)
 		printf("-payloadmin x\n");
 	    printf("-payloadmax x\n\n");
 	    
+		printf("-interval x\n");
 		printf("-intervalmin x\n");
 		printf("-intervalmax x\n\n");
 	    
-		printf("-packetcount x\n\n");
 
 		printf("Fuzzer options\n");
 		printf("-fuzzRandomSrcPort\n");
-		printf("-fuzzSequentialSrcPort\n");
+		printf("-fuzzSequentialSrcPort\n\n");
+
 		printf("-fuzzRandomDstPort\n");
-		printf("-fuzzSequentialDstPort\n");
+		printf("-fuzzSequentialDstPort\n\n");
+		
 		printf("-fuzzRandomSrcIp\n");
-		printf("-fuzzSequentialSrcIp\n");
+		printf("-fuzzSequentialSrcIp\n\n");
+
 		printf("-fuzzRandomDstIp\n");
-		printf("-fuzzSequentialDstIp\n");
-		printf("-fuzzPayloadSize\n");
+		printf("-fuzzSequentialDstIp\n\n");
+
+		printf("-fuzzPayloadSize\n\n");
+		printf("-packetcount x\n\n");
 		printf("-fuzzPacketInterval\n");
 
 
@@ -146,160 +157,183 @@ int main(int argc, char **argv)
 	printf("\n=== Parsing user input ===\n");
 	for (int i = 0; i < argc; i++)
 	{
-		if (!strcmp(argv[i], "-dstip"))
-		{
-		  dstIp = inet_addr(argv[i+1]);
-		  printf("Targeting IP address %s\n", argv[i+1]);
-		}
-		else if (!strcmp(argv[i], "-srcip"))
-		{
-		  srcIp = inet_addr(argv[i+1]);
-		  printf("Spoofed source IP address %s\n", argv[i+1]);
-		}
-		else if (!strcmp(argv[i], "-srcmac"))
-		{
-			sscanf(argv[i+1], "%x:%x:%x:%x:%x:%x", &srcMac[0], &srcMac[1], &srcMac[2], &srcMac[3], &srcMac[4], &srcMac[5]);
-			printf("Spoofed source MAC address %x:%x:%x:%x:%x:%x\n", srcMac[0], srcMac[1], srcMac[2], srcMac[3], srcMac[4], srcMac[5]);
-		}
-		else if (!strcmp(argv[i], "-dstmac"))
-		{
-			sscanf(argv[i+1], "%x:%x:%x:%x:%x:%x", &dstMac[0], &dstMac[1], &dstMac[2], &dstMac[3], &dstMac[4], &dstMac[5]);
-			printf("Targeting MAC address %x:%x:%x:%x:%x:%x\n", dstMac[0], dstMac[1], dstMac[2], dstMac[3], dstMac[4], dstMac[5]);
-		}
-		else if (!strcmp(argv[i], "-srcport"))
-		{
-			srcPort = atoi(argv[i+1]);
-			printf("Source port set to %d\n", srcPort);
-		}
-		else if (!strcmp(argv[i], "-dstport"))
-		{
-			dstPort = atoi(argv[i+1]);
-			printf("Source port set to %d\n", dstPort);
-		}
-		else if (!strcmp(argv[i], "-intervalmin"))
-		{
-			intervalMin = atoi(argv[i+1]);
-			printf("Set min interpacket delay to %d useconds\n", intervalMin);
-		}
-		else if (!strcmp(argv[i], "-intervalmax"))
-		{
-			intervalMax = atoi(argv[i+1]);
-			printf("Set max interpacket delay to %d useconds\n", intervalMax);
-		}
+		//printf("Parsing arg %s\n", argv[i]);
+		if (argv[i][0] == '-') {
+			if (!strcmp(argv[i], "-dstip"))
+			{
+				dstIp = inet_addr(argv[i+1]);
+				printf("Targeting IP address '%s' is '%d'\n", argv[i+1], dstIp);
+			}
+			else if (!strcmp(argv[i], "-srcip"))
+			{
+				srcIp = inet_addr(argv[i+1]);
+				printf("Spoofed source IP address %s\n", argv[i+1]);
+			}
+			else if (!strcmp(argv[i], "-srcmac"))
+			{
+				unsigned int d0,d1,d2,d3,d4,d5;
+				sscanf(argv[i+1], "%x:%x:%x:%x:%x:%x", &d0,&d1,&d2,&d3,&d4,&d5);
+				srcMac[0] = (uint8_t)d0;
+				srcMac[1] = (uint8_t)d1;
+				srcMac[2] = (uint8_t)d2;
+				srcMac[3] = (uint8_t)d3;
+				srcMac[4] = (uint8_t)d4;
+				srcMac[5] = (uint8_t)d5;
+				printf("Spoofed source MAC address %x:%x:%x:%x:%x:%x\n", srcMac[0], srcMac[1], srcMac[2], srcMac[3], srcMac[4], srcMac[5]);
+			}
+			else if (!strcmp(argv[i], "-dstmac"))
+			{
+				unsigned int d0,d1,d2,d3,d4,d5;
+				sscanf(argv[i+1], "%x:%x:%x:%x:%x:%x", &d0,&d1,&d2,&d3,&d4,&d5);
+				dstMac[0] = (uint8_t)d0;
+				dstMac[1] = (uint8_t)d1;
+				dstMac[2] = (uint8_t)d2;
+				dstMac[3] = (uint8_t)d3;
+				dstMac[4] = (uint8_t)d4;
+				dstMac[5] = (uint8_t)d5;
+				printf("Targeting MAC address %x:%x:%x:%x:%x:%x\n", dstMac[0], dstMac[1], dstMac[2], dstMac[3], dstMac[4], dstMac[5]);
+			}
+			else if (!strcmp(argv[i], "-srcport"))
+			{
+				srcPort = atoi(argv[i+1]);
+				printf("Source port set to %d\n", srcPort);
+			}
+			else if (!strcmp(argv[i], "-dstport"))
+			{
+				dstPort = atoi(argv[i+1]);
+				printf("Source port set to %d\n", dstPort);
+			}
+			else if (!strcmp(argv[i], "-interval"))
+			{
+				interval = atoi(argv[i+1]);
+				printf("Set interpacket delay to %d useconds\n", interval);
+			}
+			else if (!strcmp(argv[i], "-intervalmin"))
+			{
+				intervalMin = atoi(argv[i+1]);
+				printf("Set min interpacket delay to %d useconds\n", intervalMin);
+			}
+			else if (!strcmp(argv[i], "-intervalmax"))
+			{
+				intervalMax = atoi(argv[i+1]);
+				printf("Set max interpacket delay to %d useconds\n", intervalMax);
+			}
 
 
-		else if (!strcmp(argv[i], "-srcportmin"))
-		{
-			srcPortMin = atoi(argv[i+1]);
-			printf("Set min src port to %d\n", srcPortMin);
-		}
-		else if (!strcmp(argv[i], "-srcportmax"))
-		{
-			srcPortMax = atoi(argv[i+1]);
-			printf("Set max src port to %d\n", srcPortMax);
-		}
-		else if (!strcmp(argv[i], "-dstportmin"))
-		{
-			dstPortMin = atoi(argv[i+1]);
-			printf("Set min dst port  to %d\n", dstPortMin);
-		}
-		else if (!strcmp(argv[i], "-dstportmax"))
-		{
-			dstPortMax = atoi(argv[i+1]);
-			printf("Set max dst port to %d\n", dstPortMax);
-		}
+			else if (!strcmp(argv[i], "-srcportmin"))
+			{
+				srcPortMin = atoi(argv[i+1]);
+				printf("Set min src port to %d\n", srcPortMin);
+			}
+			else if (!strcmp(argv[i], "-srcportmax"))
+			{
+				srcPortMax = atoi(argv[i+1]);
+				printf("Set max src port to %d\n", srcPortMax);
+			}
+			else if (!strcmp(argv[i], "-dstportmin"))
+			{
+				dstPortMin = atoi(argv[i+1]);
+				printf("Set min dst port  to %d\n", dstPortMin);
+			}
+			else if (!strcmp(argv[i], "-dstportmax"))
+			{
+				dstPortMax = atoi(argv[i+1]);
+				printf("Set max dst port to %d\n", dstPortMax);
+			}
 
 
-		else if (!strcmp(argv[i], "-srcipmin"))
-		{
-			srcIpMin = inet_addr(argv[i+1]);
-			printf("Set min src ip to %s\n", argv[i+1]);
-		}
-		else if (!strcmp(argv[i], "-srcipmax"))
-		{
-			srcIpMax = inet_addr(argv[i+1]);
-			printf("Set max src ip to %s\n", argv[i+1]);
-		}
-		else if (!strcmp(argv[i], "-dstipmin"))
-		{
-			dstIpMin = inet_addr(argv[i+1]);
-			printf("Set min dst ip  to %s\n", argv[i+1]);
-		}
-		else if (!strcmp(argv[i], "-dstipmax"))
-		{
-			dstIpMax = inet_addr(argv[i+1]);
-			printf("Set max dst ip to %s\n", argv[i+1]);
-		}
+			else if (!strcmp(argv[i], "-srcipmin"))
+			{
+				srcIpMin = inet_addr(argv[i+1]);
+				printf("Set min src ip to %s\n", argv[i+1]);
+			}
+			else if (!strcmp(argv[i], "-srcipmax"))
+			{
+				srcIpMax = inet_addr(argv[i+1]);
+				printf("Set max src ip to %s\n", argv[i+1]);
+			}
+			else if (!strcmp(argv[i], "-dstipmin"))
+			{
+				dstIpMin = inet_addr(argv[i+1]);
+				printf("Set min dst ip  to %s\n", argv[i+1]);
+			}
+			else if (!strcmp(argv[i], "-dstipmax"))
+			{
+				dstIpMax = inet_addr(argv[i+1]);
+				printf("Set max dst ip to %s\n", argv[i+1]);
+			}
 
 
-		else if (!strcmp(argv[i], "-payloadmin"))
-		{
-			payloadSizeMin = atoi(argv[i+1]);
-			printf("Set min payload size to %d bytes\n", payloadSizeMin);
-		}
-		else if (!strcmp(argv[i], "-payloadmax"))
-		{
-			payloadSizeMax = atoi(argv[i+1]);
-			printf("Set max payload size to %d bytes\n", payloadSizeMax);
-		}
-		else if (!strcmp(argv[i], "-packetcount"))
-		{
-			packetCount = atoi(argv[i+1]);
-			printf("Number of packets to send: %d\n", packetCount);
-		}
+			else if (!strcmp(argv[i], "-payloadmin"))
+			{
+				payloadSizeMin = atoi(argv[i+1]);
+				printf("Set min payload size to %d bytes\n", payloadSizeMin);
+			}
+			else if (!strcmp(argv[i], "-payloadmax"))
+			{
+				payloadSizeMax = atoi(argv[i+1]);
+				printf("Set max payload size to %d bytes\n", payloadSizeMax);
+			}
+			else if (!strcmp(argv[i], "-packetcount"))
+			{
+				packetCount = atoi(argv[i+1]);
+				printf("Number of packets to send: %d\n", packetCount);
+			}
 
-		// Fuzzer options
-		else if (!strcmp(argv[i], "-fuzzRandomSrcPort"))
-		{
-			printf("Randomly fuzzing src port\n");
-			fuzzRandom_SrcPort= true;
+			// Fuzzer options
+			else if (!strcmp(argv[i], "-fuzzRandomSrcPort"))
+			{
+				printf("Randomly fuzzing src port\n");
+				fuzzRandom_SrcPort= true;
+			}
+			else if (!strcmp(argv[i], "-fuzzSequentialSrcPort"))
+			{
+				printf("Sequentially fuzzing src port\n");
+				fuzzSequential_SrcPort = true;
+			}
+			else if (!strcmp(argv[i], "-fuzzRandomDstPort"))
+			{
+				printf("Randomly fuzzing dst port\n");
+				fuzzRandom_DstPort = true;
+			}
+			else if (!strcmp(argv[i], "-fuzzSequentialDstPort"))
+			{
+				printf("Sequentially fuzzing dst port\n");
+				fuzzSequential_DstPort = true;
+			}
+			else if (!strcmp(argv[i], "-fuzzRandomSrcIp"))
+			{
+				fuzzRandom_SrcIp = true;
+			}
+			else if (!strcmp(argv[i], "-fuzzSequentialSrcIp"))
+			{
+				fuzzSequential_SrcIp = true;
+			}
+			else if (!strcmp(argv[i], "-fuzzRandomDstIp"))
+			{
+				fuzzRandom_DstIp = true;
+			}
+			else if (!strcmp(argv[i], "-fuzzSequentialDstIp"))
+			{
+				fuzzSequential_DstIp = true;
+			}
+			else if (!strcmp(argv[i], "-fuzzPayloadSize"))
+			{
+				fuzzPayloadSize = true;
+			}
+			else if (!strcmp(argv[i], "-fuzzPacketInterval"))
+			{
+				fuzzPacketInterval = true;
+			}
+			else
+			{
+				printf("\nERROR: option '%s' is not recognized! Please see usage instructions\n\n", argv[i]);
+				return -1;
+			}
 		}
-		else if (!strcmp(argv[i], "-fuzzSequentialSrcPort"))
-		{
-			printf("Sequentially fuzzing src port\n");
-			fuzzSequential_SrcPort = true;
-		}
-		else if (!strcmp(argv[i], "-fuzzRandomDstPort"))
-		{
-			printf("Randomly fuzzing dst port\n");
-			fuzzRandom_DstPort = true;
-		}
-		else if (!strcmp(argv[i], "-fuzzSequentialDstPort"))
-		{
-			printf("Sequentially fuzzing dst port\n");
-			fuzzSequential_DstPort = true;
-		}
-		else if (!strcmp(argv[i], "-fuzzRandomSrcIp"))
-		{
-			fuzzRandom_SrcIp = true;
-		}
-		else if (!strcmp(argv[i], "-fuzzSequentialSrcIp"))
-		{
-			fuzzSequential_SrcIp = true;
-		}
-		else if (!strcmp(argv[i], "-fuzzRandomDstIp"))
-		{
-			fuzzRandom_DstIp = true;
-		}
-		else if (!strcmp(argv[i], "-fuzzSequentialDstIp"))
-		{
-			fuzzSequential_DstIp = true;
-		}
-		else if (!strcmp(argv[i], "-fuzzPayloadSize"))
-		{
-			fuzzPayloadSize = true;
-		}
-		else if (!strcmp(argv[i], "-fuzzPacketInterval"))
-		{
-			fuzzPacketInterval = true;
-		}
-
-
 
 	}
 	printf("=== Done parsing user input ===\n\n");
-
-
 
 	if (fuzzSequential_SrcIp || fuzzRandom_SrcIp) {srcIp = srcIpMin;}	
 	if (fuzzSequential_DstIp || fuzzRandom_DstIp) {dstIp = dstIpMin;}
@@ -307,10 +341,11 @@ int main(int argc, char **argv)
 	if (fuzzSequential_DstPort || fuzzRandom_DstPort) {dstPort = dstPortMin;}
 
 
+	printf("Targeting IP address '%d'\n", dstIp);
 
 
 	unsigned int iseed = (unsigned int)time(NULL);
-  	srand (iseed);
+	srand (iseed);
 
 	int sockfd;
 	int i;
@@ -391,7 +426,7 @@ int main(int argc, char **argv)
 
 
 
-	
+
 	printf("=== Sending fuzzed packets ===\n");
 	int j = 0;
 	for (j = 0; j < packetCount; j++)
@@ -434,7 +469,7 @@ int main(int argc, char **argv)
 				iph->saddr = srcIpMin;
 			}
 		}
-		
+
 		if (fuzzSequential_DstIp)
 		{
 			iph->daddr = htonl(ntohl(iph->daddr)+ 1);
@@ -449,7 +484,7 @@ int main(int argc, char **argv)
 		{
 			iph->saddr = htonl(ntohl(srcIpMin) + rand()%(ntohl(srcIpMax) - ntohl(srcIpMin)));	
 		}
-		
+
 		if (fuzzRandom_DstIp)
 		{
 			iph->daddr = htonl(ntohl(dstIpMin) + rand()%(ntohl(dstIpMax) - ntohl(dstIpMin)));	
@@ -495,7 +530,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			usleep(intervalMin);
+			usleep(interval);
 		}
 	}
 
