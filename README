@@ -1,0 +1,44 @@
+Compile with 'g++ fast.c -o fast'
+
+Run ./fast for current usage instructions and options
+
+
+
+
+
+Usage options (may not apply to all fuzzing types),
+-srcip x.x.x.x
+-dstip x.x.x.x
+
+-srcmac xx:xx:xx:xx:xx:xx
+-dstmac xx:xx:xx:xx:xx:xx
+
+-srcport x
+-srcportmin x
+-srcportmax x
+
+-dstport x
+-dstportmin x
+-dstportmax x
+
+-payloadmin x
+-payloadmax x
+
+-intervalmin x
+-intervalmax x
+
+-packetcount x
+
+Fuzzer options
+-fuzzRandomSrcPort
+-fuzzSequentialSrcPort
+-fuzzRandomDstPort
+-fuzzSequentialDstPort
+-fuzzRandomSrcIp
+-fuzzSequentialSrcIp
+-fuzzRandomDstIp
+-fuzzSequentialDstIp
+-fuzzPayloadSize
+-fuzzPacketInterval
+
+Need more help? Use the source Luke.
