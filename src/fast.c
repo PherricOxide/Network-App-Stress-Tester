@@ -447,7 +447,12 @@ int main(int argc, char **argv)
 
 		if (fuzzRandom_SrcIp)
 		{
-			iph->saddr = srcIpMin + rand()%(srcIpMax - srcIpMin);	
+			iph->saddr = htonl(ntohl(srcIpMin) + rand()%(ntohl(srcIpMax) - ntohl(srcIpMin)));	
+		}
+		
+		if (fuzzRandom_DstIp)
+		{
+			iph->daddr = htonl(ntohl(dstIpMin) + rand()%(ntohl(dstIpMax) - ntohl(dstIpMin)));	
 		}
 
 		if (fuzzRandom_SrcPort)
