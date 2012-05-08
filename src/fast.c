@@ -1,5 +1,6 @@
 /*
  ============================================================================
+ Name		 : FAST: Fuzzing Application Stress Tester
  Author      : PherricOxide
  Description : Network application stress testing tool for sending large amounts
  of UDP packets with fuzzed fields
