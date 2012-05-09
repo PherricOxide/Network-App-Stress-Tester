@@ -77,6 +77,7 @@ int intervalMin = 1000;
 int intervalMax = 10000;
 
 // In bytes
+int payloadSize = 1;
 int payloadSizeMin = 1;
 int payloadSizeMax = 1000;
 
@@ -106,10 +107,10 @@ int main(int argc, char **argv)
 		printf("Usage options (may not apply to all fuzzing types),\n");
 	    printf("-srcip x.x.x.x\n");
 	    printf("-srcipmin x.x.x.x\n");
-	    printf("-srcipmax x.x.x.x\n");
+	    printf("-srcipmax x.x.x.x\n\n");
 	    
-		printf("-dstip x.x.x.x\n\n");
-		printf("-dstipmin x.x.x.x\n\n");
+		printf("-dstip x.x.x.x\n");
+		printf("-dstipmin x.x.x.x\n");
 		printf("-dstipmax x.x.x.x\n\n");
 
 	    printf("-srcmac xx:xx:xx:xx:xx:xx\n");
@@ -123,6 +124,7 @@ int main(int argc, char **argv)
 	    printf("-dstportmin x\n");
 	    printf("-dstportmax x\n\n");
 	    
+		printf("-payload x\n");
 		printf("-payloadmin x\n");
 	    printf("-payloadmax x\n\n");
 	    
@@ -132,21 +134,15 @@ int main(int argc, char **argv)
 	    
 
 		printf("Fuzzer options\n");
-		printf("-fuzzRandomSrcPort\n");
-		printf("-fuzzSequentialSrcPort\n\n");
-
-		printf("-fuzzRandomDstPort\n");
-		printf("-fuzzSequentialDstPort\n\n");
+		printf("-fuzz[Random|Sequential]SrcPort\n");
+		printf("-fuzz[Random|Sequential]DstPort\n");
+		printf("-fuzz[Random|Sequential]SrcIp\n");
+		printf("-fuzz[Random|Sequential]DstIp\n\n");
 		
-		printf("-fuzzRandomSrcIp\n");
-		printf("-fuzzSequentialSrcIp\n\n");
-
-		printf("-fuzzRandomDstIp\n");
-		printf("-fuzzSequentialDstIp\n\n");
-
 		printf("-fuzzPayloadSize\n\n");
+		printf("-fuzzPacketInterval\n\n");
+		
 		printf("-packetcount x\n\n");
-		printf("-fuzzPacketInterval\n");
 
 
 		printf("\nNeed more help? Use the source Luke.\n");
@@ -263,7 +259,11 @@ int main(int argc, char **argv)
 				printf("Set max dst ip to %s\n", argv[i+1]);
 			}
 
-
+			else if (!strcmp(argv[i], "-payload"))
+			{
+				payloadSize = atoi(argv[i+1]);
+				printf("Set payload size to %d bytes\n", payloadSize);
+			}
 			else if (!strcmp(argv[i], "-payloadmin"))
 			{
 				payloadSizeMin = atoi(argv[i+1]);
@@ -349,7 +349,6 @@ int main(int argc, char **argv)
 
 	int sockfd;
 	int i;
-	int payloadSize;
 
 	if ((sockfd = socket(AF_PACKET, SOCK_RAW, IPPROTO_RAW)) == -1)
 		perror("socket");
@@ -402,7 +401,7 @@ int main(int argc, char **argv)
 		sendbuf[headersLength + d] = 0x42;
 	}
 
-	tx_len = headersLength + payloadSizeMin;
+	tx_len = headersLength + payloadSize;
 
 	/* Length of UDP payload and header */
 	udph->len = htons(tx_len - sizeof(struct ether_header) - sizeof(struct iphdr));
@@ -442,10 +441,6 @@ int main(int argc, char **argv)
 			iph->tot_len = htons(headersLength + payloadSize - sizeof(struct ether_header));
 			/* Calculate IP checksum on completed header */
 			//iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr)/2);
-		}
-		else
-		{
-			payloadSize = payloadSizeMin;
 		}
 
 
