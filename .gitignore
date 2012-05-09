@@ -1,0 +1,4 @@
+/src/fast
+/src/test*
+/src/.fast.c.swp
+/src/.novatester.sh.swp
