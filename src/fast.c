@@ -38,7 +38,6 @@ along with this software. If not, see <http://www.gnu.org/licenses/>.
 #include <net/if.h>
 #include <netpacket/packet.h>
 
-
 bool fuzzRandom_SrcIp = false;
 bool fuzzSequential_SrcIp = false;
 
@@ -51,11 +50,9 @@ bool fuzzSequential_SrcPort = false;
 bool fuzzRandom_DstPort = false;
 bool fuzzSequential_DstPort = false;
 
-
 bool fuzzPayloadSize = false;
 
 bool fuzzPacketInterval = false;
-
 
 // Defaults (probably not what you want, make sure to enter real values in args)
 uint8_t srcMac[] = {0x22,0x33,0x44,0x55,0x66,0x77};
@@ -88,7 +85,6 @@ uint16_t srcPortMax = 65535;
 uint16_t dstPort = 0;
 uint16_t dstPortMin = 0;
 uint16_t dstPortMax = 65535;
-
 
 inline unsigned short csum(unsigned short *buf, int nwords)
 {
@@ -149,12 +145,34 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	// Fills the srcMac array in with the MAC address of the machine
+	// you are on. If the -srcmac <address> option is used, it will simply
+	// overwrite this array with the new chosen MAC address to spoof with.
+
+	unsigned int s0,s1,s2,s3,s4,s5;
+
+	FILE * file = fopen("/sys/class/net/eth0/address", "r");
+
+	if(file != NULL)
+	{
+		fscanf(file, "%x:%x:%x:%x:%x:%x", &s0,&s1,&s2,&s3,&s4,&s5);
+		srcMac[0] = (uint8_t)s0;
+		srcMac[1] = (uint8_t)s1;
+		srcMac[2] = (uint8_t)s2;
+		srcMac[3] = (uint8_t)s3;
+		srcMac[4] = (uint8_t)s4;
+		srcMac[5] = (uint8_t)s5;
+	}
+
+	fclose(file);
+
 	// Error checking? Nope. Don't enter inputs wrong, this is quick and dirty and will explode
 	printf("\n=== Parsing user input ===\n");
 	for (int i = 0; i < argc; i++)
 	{
 		//printf("Parsing arg %s\n", argv[i]);
-		if (argv[i][0] == '-') {
+		if (argv[i][0] == '-') 
+		{
 			if (!strcmp(argv[i], "-dstip"))
 			{
 				dstIp = inet_addr(argv[i+1]);
@@ -168,25 +186,30 @@ int main(int argc, char **argv)
 			else if (!strcmp(argv[i], "-srcmac"))
 			{
 				unsigned int d0,d1,d2,d3,d4,d5;
-				sscanf(argv[i+1], "%x:%x:%x:%x:%x:%x", &d0,&d1,&d2,&d3,&d4,&d5);
+
+				sscanf(argv[i + 1], "%x:%x:%x:%x:%x:%x", &d0,&d1,&d2,&d3,&d4,&d5);
 				srcMac[0] = (uint8_t)d0;
 				srcMac[1] = (uint8_t)d1;
 				srcMac[2] = (uint8_t)d2;
 				srcMac[3] = (uint8_t)d3;
 				srcMac[4] = (uint8_t)d4;
 				srcMac[5] = (uint8_t)d5;
+
 				printf("Spoofed source MAC address %x:%x:%x:%x:%x:%x\n", srcMac[0], srcMac[1], srcMac[2], srcMac[3], srcMac[4], srcMac[5]);
 			}
 			else if (!strcmp(argv[i], "-dstmac"))
 			{
 				unsigned int d0,d1,d2,d3,d4,d5;
+
 				sscanf(argv[i+1], "%x:%x:%x:%x:%x:%x", &d0,&d1,&d2,&d3,&d4,&d5);
+
 				dstMac[0] = (uint8_t)d0;
 				dstMac[1] = (uint8_t)d1;
 				dstMac[2] = (uint8_t)d2;
 				dstMac[3] = (uint8_t)d3;
 				dstMac[4] = (uint8_t)d4;
 				dstMac[5] = (uint8_t)d5;
+
 				printf("Targeting MAC address %x:%x:%x:%x:%x:%x\n", dstMac[0], dstMac[1], dstMac[2], dstMac[3], dstMac[4], dstMac[5]);
 			}
 			else if (!strcmp(argv[i], "-srcport"))
@@ -333,6 +356,7 @@ int main(int argc, char **argv)
 		}
 
 	}
+
 	printf("=== Done parsing user input ===\n\n");
 
 	if (fuzzSequential_SrcIp || fuzzRandom_SrcIp) {srcIp = srcIpMin;}	
@@ -340,9 +364,7 @@ int main(int argc, char **argv)
 	if (fuzzSequential_SrcPort || fuzzRandom_SrcPort) {srcPort = srcPortMin;}
 	if (fuzzSequential_DstPort || fuzzRandom_DstPort) {dstPort = dstPortMin;}
 
-
 	printf("Targeting IP address '%d'\n", dstIp);
-
 
 	unsigned int iseed = (unsigned int)time(NULL);
 	srand (iseed);
