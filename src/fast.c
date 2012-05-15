@@ -37,6 +37,7 @@ along with this software. If not, see <http://www.gnu.org/licenses/>.
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netpacket/packet.h>
+#include <linux/icmp.h>
 
 bool fuzzRandom_SrcIp = false;
 bool fuzzSequential_SrcIp = false;
@@ -85,6 +86,8 @@ uint16_t srcPortMax = 65535;
 uint16_t dstPort = 0;
 uint16_t dstPortMin = 0;
 uint16_t dstPortMax = 65535;
+
+char * dstIpString;
 
 inline unsigned short csum(unsigned short *buf, int nwords)
 {
@@ -175,8 +178,110 @@ int main(int argc, char **argv)
 		{
 			if (!strcmp(argv[i], "-dstip"))
 			{
+				dstIpString = argv[i + 1];
 				dstIp = inet_addr(argv[i+1]);
 				printf("Targeting IP address '%s' is '%d'\n", argv[i+1], dstIp);
+
+				// Fills the dstMac array dynamically s.t. the dstMac
+				// flag must needs only be called when the machine
+				// in question lies outside the local ethernet segment
+				// Nota bene: if the -dstMac flag is called before 
+				// the -dstip flag is, the address will be overwritten below;
+				// conversely, if the -dstip is called first, -dstmac will
+				// overwrite the result of the code below.
+				// Must be given after -srcip
+
+				struct icmphdr* icmp;
+				struct iphdr* ip;
+				struct sockaddr_in connection;
+				int found = 0;
+				unsigned int d0,d1,d2,d3,d4,d5;
+				int sockfd;
+				int optval;	
+				size_t nbytes = 256;
+				char* line;
+				char* pch;
+				char* packet = (char *)malloc(sizeof(struct iphdr) + sizeof(struct icmphdr));
+				char* buffer = (char *)malloc(sizeof(struct iphdr) + sizeof(struct icmphdr));
+				ip = (struct iphdr*) packet;
+				icmp = (struct icmphdr*) (packet + sizeof(struct icmphdr));
+
+				ip->ihl = 5;
+				ip->version = 4;
+				ip->tos = 0;
+				ip->tot_len = sizeof(struct iphdr) + sizeof(struct icmphdr);
+				ip->id = htons(0);
+				ip->frag_off = 0;
+				ip->ttl = 64;
+				ip->protocol = IPPROTO_ICMP;
+				ip->saddr = srcIp;
+				ip->daddr = dstIp;
+				ip->check = csum((unsigned short *)ip, sizeof(struct iphdr));
+
+				if((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1)
+				{
+					perror("socket");
+					delete icmp;
+					delete ip;
+					free(buffer);
+					free(packet);
+					continue;
+				}
+
+				setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &optval, sizeof(int));
+
+				icmp->type = ICMP_ECHO;
+				icmp->code = 0;
+				icmp->un.echo.id = random();
+				icmp->un.echo.sequence = 0;
+				icmp->checksum = csum((unsigned short *)icmp, sizeof(struct icmphdr));
+				
+				connection.sin_family = AF_INET;
+				connection.sin_addr.s_addr = dstIp;
+
+				sendto(sockfd, packet, ip->tot_len, 0, (struct sockaddr *)&connection, sizeof(struct sockaddr));
+				sendto(sockfd, packet, ip->tot_len, 0, (struct sockaddr *)&connection, sizeof(struct sockaddr));
+
+				close(sockfd);
+				free(buffer);
+				free(packet);
+
+				sleep(1);
+
+				FILE * file = fopen("/proc/net/arp", "r");
+				
+				line = (char *) malloc(nbytes + 1);	
+
+				while(getline(&line, &nbytes, file) > 0)
+				{
+					pch = strtok(line, " \t\n");
+
+					if(!strcmp(pch, dstIpString))
+					{
+						pch = strtok(NULL, " \t\n");
+						pch = strtok(NULL, " \t\n");
+						pch = strtok(NULL, " \t\n");
+
+						sscanf(pch, "%x:%x:%x:%x:%x:%x", &d0,&d1,&d2,&d3,&d4,&d5);
+
+						dstMac[0] = (uint8_t)d0;
+						dstMac[1] = (uint8_t)d1;
+						dstMac[2] = (uint8_t)d2;
+						dstMac[3] = (uint8_t)d3;
+						dstMac[4] = (uint8_t)d4;
+						dstMac[5] = (uint8_t)d5;
+
+						found = 1;
+	
+						break;
+					}
+				}
+
+				fclose(file);
+
+				free(line);
+
+				printf("Targeting MAC address %x:%x:%x:%x:%x:%x\n", dstMac[0], dstMac[1], dstMac[2], dstMac[3], dstMac[4], dstMac[5]);
 			}
 			else if (!strcmp(argv[i], "-srcip"))
 			{
