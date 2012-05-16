@@ -56,7 +56,7 @@ bool fuzzPayloadSize = false;
 bool fuzzPacketInterval = false;
 
 // Defaults (probably not what you want, make sure to enter real values in args)
-uint8_t srcMac[] = {0x22,0x33,0x44,0x55,0x66,0x77};
+uint8_t srcMac[6];
 uint8_t dstMac[6];
 
 uint32_t dstIp;
