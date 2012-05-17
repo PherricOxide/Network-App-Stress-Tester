@@ -89,11 +89,13 @@ uint16_t dstPortMax = 65535;
 
 char * dstIpString;
 
-inline unsigned short csum(unsigned short *buf, int nwords)
+inline unsigned short csum(unsigned short *buf, int bytes)
 {
 	unsigned long sum;
-	for(sum=0; nwords>0; nwords--)
+	for(sum=0; bytes>1; bytes -= 2)
 		sum += *buf++;
+	if (bytes)
+		sum += *(unsigned char*)buf;
 	sum = (sum >> 16) + (sum &0xffff);
 	sum += (sum >> 16);
 	return (unsigned short)(~sum);
@@ -216,6 +218,7 @@ int main(int argc, char **argv)
 				ip->protocol = IPPROTO_ICMP;
 				ip->saddr = srcIp;
 				ip->daddr = dstIp;
+				ip->check = 0;
 				ip->check = csum((unsigned short *)ip, sizeof(struct iphdr));
 
 				if((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1)
@@ -231,9 +234,10 @@ int main(int argc, char **argv)
 				setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &optval, sizeof(int));
 
 				icmp->type = ICMP_ECHO;
-				icmp->code = 0;
+				icmp->code = 42;
 				icmp->un.echo.id = random();
 				icmp->un.echo.sequence = 0;
+				icmp->checksum = 0;
 				icmp->checksum = csum((unsigned short *)icmp, sizeof(struct icmphdr));
 				
 				connection.sin_family = AF_INET;
@@ -535,7 +539,8 @@ int main(int argc, char **argv)
 	/* Length of IP payload and header */
 	iph->tot_len = htons(tx_len - sizeof(struct ether_header));
 	/* Calculate IP checksum on completed header */
-	iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr)/2);
+	iph->check = 0;
+	iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr));
 
 
 	/* Destination address */
@@ -567,14 +572,14 @@ int main(int argc, char **argv)
 			/* Length of IP payload and header */
 			iph->tot_len = htons(headersLength + payloadSize - sizeof(struct ether_header));
 			/* Calculate IP checksum on completed header */
-			//iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr)/2);
+			//iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr));
 		}
 
 
 		// Send the packet we crafted
 		/* Calculate IP checksum on completed header */
 		iph->check = 0;
-		iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr)/2);
+		iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr));
 		if (sendto(sockfd, sendbuf, headersLength + payloadSize, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
 		{
 			printf("Send failed\n");
