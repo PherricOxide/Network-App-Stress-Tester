@@ -194,7 +194,6 @@ int main(int argc, char **argv)
 				// Must be given after -srcip
 
 				struct icmphdr* icmp;
-				struct iphdr* ip;
 				struct sockaddr_in connection;
 				int found = 0;
 				unsigned int d0,d1,d2,d3,d4,d5;
@@ -203,30 +202,13 @@ int main(int argc, char **argv)
 				size_t nbytes = 256;
 				char* line;
 				char* pch;
-				char* packet = (char *)malloc(sizeof(struct iphdr) + sizeof(struct icmphdr));
-				char* buffer = (char *)malloc(sizeof(struct iphdr) + sizeof(struct icmphdr));
-				ip = (struct iphdr*) packet;
-				icmp = (struct icmphdr*) (packet + sizeof(struct icmphdr));
-
-				ip->ihl = 5;
-				ip->version = 4;
-				ip->tos = 0;
-				ip->tot_len = sizeof(struct iphdr) + sizeof(struct icmphdr);
-				ip->id = htons(0);
-				ip->frag_off = 0;
-				ip->ttl = 64;
-				ip->protocol = IPPROTO_ICMP;
-				ip->saddr = srcIp;
-				ip->daddr = dstIp;
-				ip->check = 0;
-				ip->check = csum((unsigned short *)ip, sizeof(struct iphdr));
+				char* packet = (char *)calloc(1, sizeof(struct icmphdr));
+				icmp = (struct icmphdr*) (packet);
 
 				if((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1)
 				{
 					perror("socket");
 					delete icmp;
-					delete ip;
-					free(buffer);
 					free(packet);
 					continue;
 				}
@@ -234,7 +216,7 @@ int main(int argc, char **argv)
 				setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &optval, sizeof(int));
 
 				icmp->type = ICMP_ECHO;
-				icmp->code = 42;
+				icmp->code = 0;
 				icmp->un.echo.id = random();
 				icmp->un.echo.sequence = 0;
 				icmp->checksum = 0;
@@ -243,11 +225,10 @@ int main(int argc, char **argv)
 				connection.sin_family = AF_INET;
 				connection.sin_addr.s_addr = dstIp;
 
-				sendto(sockfd, packet, ip->tot_len, 0, (struct sockaddr *)&connection, sizeof(struct sockaddr));
-				sendto(sockfd, packet, ip->tot_len, 0, (struct sockaddr *)&connection, sizeof(struct sockaddr));
+				sendto(sockfd, packet, sizeof(struct icmphdr), 0, (struct sockaddr *)&connection, sizeof(struct sockaddr));
+				sendto(sockfd, packet, sizeof(struct icmphdr), 0, (struct sockaddr *)&connection, sizeof(struct sockaddr));
 
 				close(sockfd);
-				free(buffer);
 				free(packet);
 
 				sleep(1);
