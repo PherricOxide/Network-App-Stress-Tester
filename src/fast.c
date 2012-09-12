@@ -156,7 +156,7 @@ int main(int argc, char **argv)
 
 	unsigned int s0,s1,s2,s3,s4,s5;
 
-	FILE * file = fopen("/sys/class/net/eth0/address", "r");
+	FILE * file = fopen("/sys/class/net/vboxnet0/address", "r");
 
 	if(file != NULL)
 	{
@@ -208,7 +208,6 @@ int main(int argc, char **argv)
 				if((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1)
 				{
 					perror("socket");
-					delete icmp;
 					free(packet);
 					continue;
 				}
@@ -529,7 +528,7 @@ int main(int argc, char **argv)
 
 	/* Index of the network device */
 	// TODO: Throw in an interface command line option
-	socket_address.sll_ifindex = if_nametoindex("eth0");
+	socket_address.sll_ifindex = if_nametoindex("vboxnet1");
 	/* Address length*/
 	socket_address.sll_halen = ETH_ALEN;
 	/* Destination MAC */
