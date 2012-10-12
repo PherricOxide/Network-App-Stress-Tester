@@ -20,7 +20,7 @@ along with this software. If not, see <http://www.gnu.org/licenses/>.
  ============================================================================
  */
 
-
+#include <errno.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <time.h>
@@ -38,6 +38,9 @@ along with this software. If not, see <http://www.gnu.org/licenses/>.
 #include <net/if.h>
 #include <netpacket/packet.h>
 #include <linux/icmp.h>
+
+
+char *interface = "eth0";
 
 bool fuzzRandom_SrcIp = false;
 bool fuzzSequential_SrcIp = false;
@@ -106,28 +109,28 @@ int main(int argc, char **argv)
 
 	if (argc < 2) {
 		printf("Usage options (may not apply to all fuzzing types),\n");
-	    printf("-srcip x.x.x.x\n");
-	    printf("-srcipmin x.x.x.x\n");
-	    printf("-srcipmax x.x.x.x\n\n");
+		printf("-srcip x.x.x.x\n");
+		printf("-srcipmin x.x.x.x\n");
+		printf("-srcipmax x.x.x.x\n\n");
 	    
 		printf("-dstip x.x.x.x\n");
 		printf("-dstipmin x.x.x.x\n");
 		printf("-dstipmax x.x.x.x\n\n");
 
-	    printf("-srcmac xx:xx:xx:xx:xx:xx\n");
-	    printf("-dstmac xx:xx:xx:xx:xx:xx\n\n");
+		printf("-srcmac xx:xx:xx:xx:xx:xx\n");
+		printf("-dstmac xx:xx:xx:xx:xx:xx\n\n");
 	    
 		printf("-srcport x\n");
 		printf("-srcportmin x\n");
 		printf("-srcportmax x\n\n");
 
-	    printf("-dstport x\n");
-	    printf("-dstportmin x\n");
-	    printf("-dstportmax x\n\n");
-	    
+		printf("-dstport x\n");
+		printf("-dstportmin x\n");
+		printf("-dstportmax x\n\n");
+
 		printf("-payload x\n");
 		printf("-payloadmin x\n");
-	    printf("-payloadmax x\n\n");
+		printf("-payloadmax x\n\n");
 	    
 		printf("-interval x\n");
 		printf("-intervalmin x\n");
@@ -155,8 +158,12 @@ int main(int argc, char **argv)
 	// overwrite this array with the new chosen MAC address to spoof with.
 
 	unsigned int s0,s1,s2,s3,s4,s5;
-
-	FILE * file = fopen("/sys/class/net/vboxnet0/address", "r");
+	
+	char fileNameBuffer[1024];
+	strcpy(fileNameBuffer, "/sys/class/net/");
+	strcat(fileNameBuffer, interface);
+	strcat(fileNameBuffer, "/address");
+	FILE * file = fopen(fileNameBuffer, "r");
 
 	if(file != NULL)
 	{
@@ -167,9 +174,10 @@ int main(int argc, char **argv)
 		srcMac[3] = (uint8_t)s3;
 		srcMac[4] = (uint8_t)s4;
 		srcMac[5] = (uint8_t)s5;
+		
+		fclose(file);
 	}
 
-	fclose(file);
 
 	// Error checking? Nope. Don't enter inputs wrong, this is quick and dirty and will explode
 	printf("\n=== Parsing user input ===\n");
@@ -233,6 +241,9 @@ int main(int argc, char **argv)
 				sleep(1);
 
 				FILE * file = fopen("/proc/net/arp", "r");
+				if (file == NULL) {
+					printf("Unable to open file /proc/net/arp due to error %s\n", strerror(errno));
+				}
 				
 				line = (char *) malloc(nbytes + 1);	
 
@@ -326,8 +337,11 @@ int main(int argc, char **argv)
 				intervalMax = atoi(argv[i+1]);
 				printf("Set max interpacket delay to %d useconds\n", intervalMax);
 			}
-
-
+			else if (!strcmp(argv[i], "-interface"))
+			{
+				interface = argv[i+1];
+				printf("Set interface to %s\n", interface);
+			}
 			else if (!strcmp(argv[i], "-srcportmin"))
 			{
 				srcPortMin = atoi(argv[i+1]);
@@ -528,7 +542,7 @@ int main(int argc, char **argv)
 
 	/* Index of the network device */
 	// TODO: Throw in an interface command line option
-	socket_address.sll_ifindex = if_nametoindex("vboxnet1");
+	socket_address.sll_ifindex = if_nametoindex(interface);
 	/* Address length*/
 	socket_address.sll_halen = ETH_ALEN;
 	/* Destination MAC */
@@ -562,13 +576,12 @@ int main(int argc, char **argv)
 		iph->check = csum((unsigned short *)(sendbuf+sizeof(struct ether_header)), sizeof(struct iphdr));
 		if (sendto(sockfd, sendbuf, headersLength + payloadSize, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0)
 		{
-			printf("Send failed\n");
+			printf("Send failed due to error %s\n", strerror(errno));
 		}
 
 		// Set up the headers for the next packet
 		if (fuzzSequential_SrcIp)
 		{
-			printf("Fuzzing src ip\n");
 			iph->saddr = htonl(ntohl(iph->saddr)+ 1);
 
 			if (iph->saddr == srcIpMax)
